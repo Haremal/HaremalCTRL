@@ -39,13 +39,64 @@ fn App() -> Element {
                 button { onclick: move |_| tab.set(5), class: "tab_button", background_color: if tab() == 5 { "#3f4146" },  "Desktop" }
             }
             match tab() {
-                1 => tabs::region::Region(),
-                2 => tabs::applications::Applications(),
-                3 => tabs::devices::Devices(),
-                4 => tabs::appearance::Appearance(),
-                5 => tabs::desktop::Desktop(),
-                _ => tabs::update::Update(),
+                1 => rsx! { tabs::region::Region {} },
+                2 => rsx! { tabs::applications::Applications {} },
+                3 => rsx! { tabs::devices::Devices {} },
+                4 => rsx! { tabs::appearance::Appearance {} },
+                5 => rsx! { tabs::desktop::Desktop {} },
+                _ => rsx! { tabs::update::Update {} },
             }
         }
     }
+}
+
+pub fn save_config(key: &str, value: &str) {
+    let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
+    let mut path = std::path::PathBuf::from(base);
+
+    path.push("haremal-ctrl");
+    if let Err(e) = std::fs::create_dir_all(&path) {
+        eprintln!("Failed to create config directory: {}", e);
+        return;
+    }
+
+    path.push("config.toml");
+    let content = std::fs::read_to_string(&path).unwrap_or_default();
+
+    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+    let mut found = false;
+
+    for line in lines.iter_mut() {
+        if line.trim().starts_with(key) && line.contains('=') {
+            *line = format!("{} = \"{}\"", key, value);
+            found = true;
+            break;
+        }
+    }
+
+    if !found {
+        lines.push(format!("{} = \"{}\"", key, value));
+    }
+
+    let new_content = lines.join("\n");
+    if let Err(e) = std::fs::write(&path, new_content) {
+        eprintln!("Error saving config: {}", e);
+    }
+}
+
+pub fn load_config(key: &str) -> Option<String> {
+    let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
+    let path = std::path::PathBuf::from(base).join("haremal-ctrl/config.toml");
+
+    let content = std::fs::read_to_string(path).ok()?;
+
+    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+
+    for line in lines.iter_mut() {
+        if line.trim().starts_with(key) {
+            let parts: Vec<&str> = line.split('=').collect();
+            return Some(parts.get(1)?.trim().replace('"', ""));
+        }
+    }
+    None
 }
