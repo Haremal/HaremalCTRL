@@ -1,3 +1,5 @@
+use std::arch::x86_64::_mm_blendv_epi8;
+
 use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
 
@@ -21,7 +23,7 @@ fn main() {
 #[component]
 fn App() -> Element {
     let mut tab = use_signal(|| 0);
-
+    let major_changes = use_context_provider(|| Signal::new(false));
     rsx! {
         document::Link { rel: "stylesheet", href: CSS }
         main {
@@ -37,6 +39,8 @@ fn App() -> Element {
                 button { onclick: move |_| tab.set(3), class: "tab_button", background_color: if tab() == 3 { "#3f4146" },  "Devices" }
                 button { onclick: move |_| tab.set(4), class: "tab_button", background_color: if tab() == 4 { "#3f4146" },  "Appearance" }
                 button { onclick: move |_| tab.set(5), class: "tab_button", background_color: if tab() == 5 { "#3f4146" },  "Desktop" }
+                h3 { visibility: if !major_changes() { "hidden" }, color: "orange", opacity: "50%", font_weight: "200", position: "absolute", bottom: "60px", left: "20px", width: "300px", "Some changes might require a restart to work properly"}
+                button { visibility: if !major_changes() { "hidden" }, onclick: move |_| { std::process::Command::new("reboot").status().ok(); }, position: "absolute", bottom: "20px", left: "20px", color: "orange", opacity: "50%", "REBOOT NOW" }
             }
             match tab() {
                 1 => rsx! { tabs::region::Region {} },
@@ -53,7 +57,6 @@ fn App() -> Element {
 pub fn save_config(key: &str, value: &str) {
     let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
     let mut path = std::path::PathBuf::from(base);
-
     path.push("haremal-ctrl");
     if let Err(e) = std::fs::create_dir_all(&path) {
         eprintln!("Failed to create config directory: {}", e);
@@ -62,7 +65,6 @@ pub fn save_config(key: &str, value: &str) {
 
     path.push("config.toml");
     let content = std::fs::read_to_string(&path).unwrap_or_default();
-
     let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
     let mut found = false;
 
@@ -99,4 +101,31 @@ pub fn load_config(key: &str) -> Option<String> {
         }
     }
     None
+}
+
+pub fn edit_config(file: &str, keys: &[&str], value: &str) {
+    let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
+    let mut path = std::path::PathBuf::from(base);
+    path.push(file);
+
+    let content = std::fs::read_to_string(&path).unwrap_or_default();
+    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+
+    let mut passed = 0;
+    for line in lines.iter_mut() {
+        if line.trim().starts_with(keys[passed]) {
+            passed += 1;
+            if passed >= keys.len() {
+                let start = line.find('"').unwrap_or(0);
+                let end = line.rfind('"').unwrap_or(line.len());
+                line.replace_range(start + 1..end, value);
+                break;
+            }
+        }
+    }
+
+    let new_content = lines.join("\n");
+    if let Err(e) = std::fs::write(&path, new_content) {
+        eprintln!("Error saving config: {}", e);
+    }
 }
