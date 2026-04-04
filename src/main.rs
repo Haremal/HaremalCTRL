@@ -1,5 +1,3 @@
-use std::arch::x86_64::_mm_blendv_epi8;
-
 use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
 
@@ -8,13 +6,22 @@ const CSS: Asset = asset!("/assets/main.css");
 mod tabs;
 
 fn main() {
+    let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
+    let path = std::path::PathBuf::from(base).join("haremal-ctrl");
+    if let Err(e) = std::fs::create_dir_all(&path) {
+        eprintln!("Failed to create config directory: {}", e);
+        return;
+    }
+
     let window = WindowBuilder::new()
+        .with_title("HaremalCTRL")
         .with_decorations(false)
         .with_transparent(true)
         .with_resizable(true);
 
     let cfg = Config::new()
         .with_window(window)
+        .with_disable_context_menu(true)
         .with_disable_drag_drop_handler(true);
 
     LaunchBuilder::desktop().with_cfg(cfg).launch(App);
@@ -29,10 +36,10 @@ fn App() -> Element {
         main {
             display: "flex",
             div {
-                id: "sidebar",
+                border_radius: "16px 0px 0px 16px",
                 width: "300px", height: "100vh",
                 background_color: "#1f2126",
-                h2 { font_weight: "bold", padding: "20px",  "Haremal Controller" },
+                h2 { font_size: "200%", font_weight: "bold", padding_left: "20px", "HaremalCTRL Settings" },
                 button { onclick: move |_| tab.set(0), class: "tab_button", background_color: if tab() == 0 { "#3f4146" },  "Update" }
                 button { onclick: move |_| tab.set(1), class: "tab_button", background_color: if tab() == 1 { "#3f4146" },  "Region" }
                 button { onclick: move |_| tab.set(2), class: "tab_button", background_color: if tab() == 2 { "#3f4146" },  "Applications" }
@@ -54,30 +61,72 @@ fn App() -> Element {
     }
 }
 
-pub fn save_config(key: &str, value: &str) {
+pub fn load_config(file: Option<&str>, keys: &[&str]) -> Vec<String> {
+    let filename = file.unwrap_or("haremal-ctrl/config.toml");
     let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
-    let mut path = std::path::PathBuf::from(base);
-    path.push("haremal-ctrl");
-    if let Err(e) = std::fs::create_dir_all(&path) {
-        eprintln!("Failed to create config directory: {}", e);
-        return;
-    }
+    let path = std::path::PathBuf::from(base).join(filename);
+    let content = std::fs::read_to_string(path).ok().unwrap_or_default();
+    let lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
 
-    path.push("config.toml");
+    let mut passed = 0;
+    let mut list = Vec::new();
+    let mut collecting = false;
+    for line in lines.into_iter() {
+        let trimmed = line.trim();
+        if !collecting && line.trim().starts_with(keys[passed]) {
+            passed += 1;
+            if passed >= keys.len() {
+                collecting = true;
+            }
+        }
+
+        if collecting {
+            passed += trimmed.matches('{').count();
+            passed -= trimmed.matches('}').count();
+            list.push(line.to_string());
+            if passed < keys.len() {
+                break;
+            }
+        }
+    }
+    list
+}
+
+pub fn save_config(file: Option<&str>, keys: &[&str], value: &str) {
+    let filename = file.unwrap_or("haremal-ctrl/config.toml");
+    let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
+    let path = std::path::PathBuf::from(base).join(filename);
     let content = std::fs::read_to_string(&path).unwrap_or_default();
     let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-    let mut found = false;
 
-    for line in lines.iter_mut() {
-        if line.trim().starts_with(key) && line.contains('=') {
-            *line = format!("{} = \"{}\"", key, value);
-            found = true;
-            break;
+    let mut passed = 0;
+    let mut starting_line = 0;
+    for (i, line) in lines.iter_mut().enumerate() {
+        if line.trim().starts_with(keys[passed]) {
+            starting_line = i;
+            passed += 1;
+            if passed >= keys.len() {
+                if let (Some(start), Some(end)) = (line.find('"'), line.rfind('"')) {
+                    if start != end {
+                        line.replace_range(start + 1..end, value);
+                    }
+                } else {
+                    lines.insert(starting_line + 1, String::from(value));
+                }
+                break;
+            }
         }
     }
 
-    if !found {
-        lines.push(format!("{} = \"{}\"", key, value));
+    while passed < keys.len() {
+        if passed == keys.len() - 1 {
+            lines.insert(starting_line + 1, format!("{} \"{}\"", keys[passed], value));
+        } else {
+            lines.insert(starting_line + 1, format!("{} {{", keys[passed]));
+            lines.insert(starting_line + 2, "}".to_string());
+        }
+        starting_line += 1;
+        passed += 1;
     }
 
     let new_content = lines.join("\n");
@@ -86,44 +135,27 @@ pub fn save_config(key: &str, value: &str) {
     }
 }
 
-pub fn load_config(key: &str) -> Option<String> {
+pub fn remove_config(file: Option<&str>, keys: &[&str]) {
+    let filename = file.unwrap_or("haremal-ctrl/config.toml");
     let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
-    let path = std::path::PathBuf::from(base).join("haremal-ctrl/config.toml");
-
-    let content = std::fs::read_to_string(path).ok()?;
-
-    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-
-    for line in lines.iter_mut() {
-        if line.trim().starts_with(key) {
-            let parts: Vec<&str> = line.split('=').collect();
-            return Some(parts.get(1)?.trim().replace('"', ""));
-        }
-    }
-    None
-}
-
-pub fn edit_config(file: &str, keys: &[&str], value: &str) {
-    let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
-    let mut path = std::path::PathBuf::from(base);
-    path.push(file);
-
+    let path = std::path::PathBuf::from(base).join(filename);
     let content = std::fs::read_to_string(&path).unwrap_or_default();
     let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-
+    println!("AAAAAA");
     let mut passed = 0;
-    for line in lines.iter_mut() {
-        if line.trim().starts_with(keys[passed]) {
+    let mut to_remove = None;
+    for (i, line) in lines.iter().enumerate() {
+        if line.trim().contains(keys[passed]) {
             passed += 1;
             if passed >= keys.len() {
-                let start = line.find('"').unwrap_or(0);
-                let end = line.rfind('"').unwrap_or(line.len());
-                line.replace_range(start + 1..end, value);
+                to_remove = Some(i);
                 break;
             }
         }
     }
-
+    if let Some(i) = to_remove {
+        lines.remove(i);
+    }
     let new_content = lines.join("\n");
     if let Err(e) = std::fs::write(&path, new_content) {
         eprintln!("Error saving config: {}", e);

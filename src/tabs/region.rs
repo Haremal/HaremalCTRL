@@ -1,25 +1,45 @@
-use crate::{edit_config, load_config, save_config};
+use crate::{load_config, save_config};
 use dioxus::prelude::*;
 
 #[component]
 pub fn Region() -> Element {
-    let mut current_timezone =
-        use_signal(|| load_config("timezone").unwrap_or_else(|| "America/New_York".to_string()));
+    let mut current_timezone = use_signal(|| {
+        load_config(None, &["timezone"])[0]
+            .split('"')
+            .nth(1)
+            .unwrap_or("America/New_York")
+            .to_string()
+            .clone()
+    });
     let timezones = get_timezones();
 
-    let mut current_language =
-        use_signal(|| load_config("language").unwrap_or_else(|| "en_US.UTF-8".to_string()));
+    let mut current_language = use_signal(|| {
+        load_config(None, &["language"])[0]
+            .split('"')
+            .nth(1)
+            .unwrap_or("English (US)")
+            .to_string()
+            .clone()
+    });
     let languages = get_languages();
-    let mut seen_languages = std::collections::HashSet::new();
     let mut languages_disabled = use_signal(|| false);
 
-    let mut current_layout =
-        use_signal(|| load_config("layout").unwrap_or_else(|| "us".to_string()));
+    let mut current_layout = use_signal(|| {
+        load_config(
+            Some("niri/config.kdl"),
+            &["input", "keyboard", "xkb", "layout"],
+        )[0]
+        .split('"')
+        .nth(1)
+        .unwrap_or("us")
+        .to_string()
+        .clone()
+    });
     let layouts = get_layouts();
 
     rsx! {
         div {
-            font_size: "150%", padding: "20px",
+            class: "tab",
             h1 { "Region" }
             div {
                 div {
@@ -32,7 +52,7 @@ pub fn Region() -> Element {
                                 .args(["timedatectl", "set-timezone", &evt.value()])
                                 .spawn()
                                 .expect("Failed to set timezone").wait().unwrap();
-                            save_config("timezone", &evt.value());
+                            save_config(None, &["timezone"], &evt.value());
                         },
                         float: "right", margin: "20px", width: "150px",
 
@@ -61,7 +81,7 @@ pub fn Region() -> Element {
                             });
 
                             current_language.set(evt.value());
-                            save_config("language", &evt.value());
+                            save_config(None, &["language"], &evt.value());
 
                         },
                         float: "right", margin: "20px", width: "150px",
@@ -69,15 +89,22 @@ pub fn Region() -> Element {
                         {
                             languages.iter().filter_map(|language| {
                                 if language.contains('@') || !language.contains(".UTF-8") || language == "C.UTF-8" { return None; }
-                                let lang_id = language.split('_').next().unwrap_or(language);
-                                if !seen_languages.insert(lang_id.to_string()) { return None; }
-                                let pretty_name = if lang_id.len() == 2 || lang_id.len() == 3 {
+                                let mut parts = language.split('_');
+                                let lang_id = parts.next().unwrap_or("");
+                                let country_id = parts.next().unwrap_or("").split(".").next().unwrap_or("");
+                                let lang_name = if lang_id.len() == 2 || lang_id.len() == 3 {
                                     locale_codes::language::lookup(lang_id)
                                         .map(|l| l.reference_name.to_string())
                                         .unwrap_or_else(|| lang_id.to_uppercase())
                                 } else {
                                     return None;
                                 };
+                                let country_name = if !country_id.is_empty() {
+                                    format!(" ({})", country_id)
+                                } else {
+                                    "".to_string()
+                                };
+                                let pretty_name = format!("{}{}", lang_name, country_name);
                                 Some(rsx! {
                                     option {
                                         value: "{language}",
@@ -95,8 +122,7 @@ pub fn Region() -> Element {
                     select {
                         onchange: move |evt: FormEvent| {
                             current_layout.set(evt.value());
-                            save_config("layout", &evt.value());
-                            edit_config("niri/config.kdl", &["input", "keyboard", "xkb", "layout"], &evt.value());
+                            save_config(Some("niri/config.kdl"), &["input", "keyboard", "xkb", "layout"], &evt.value());
                         },
                         float: "right", margin: "20px", width: "150px",
 
