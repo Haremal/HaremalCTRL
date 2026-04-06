@@ -31,6 +31,7 @@ fn main() {
         for mimeapp in &mimeapps {
             save_config(Some("mimeapps.list"), &[""], mimeapp);
         }
+        save_config(Some("mimeapps.list"), &[""], "[Default Applications]");
     }
 
     let window = WindowBuilder::new()
