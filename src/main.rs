@@ -1,16 +1,36 @@
 use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
-
+use std::path::Path;
 const CSS: Asset = asset!("/assets/main.css");
 
 mod tabs;
 
 fn main() {
+    std::fs::write("debug.log", "App started\n").ok();
     let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
-    let path = std::path::PathBuf::from(base).join("haremal-ctrl");
+    let path = std::path::PathBuf::from(&base).join("haremal-ctrl");
     if let Err(e) = std::fs::create_dir_all(&path) {
         eprintln!("Failed to create config directory: {}", e);
         return;
+    }
+    let mimeapps_path = std::path::PathBuf::from(base).join("mimeapps.list");
+    if !Path::new(&mimeapps_path).exists() {
+        let mut mimeapps = load_config(Some("/usr/share/applications/mimeinfo.cache"), &[""]);
+        mimeapps.retain(|item| {
+            let m = &item.to_string();
+            m.starts_with("inode/directory")
+                || m.starts_with("text/")
+                || m.starts_with("image/")
+                || m.starts_with("video/")
+                || m.starts_with("audio/")
+                || m.starts_with("application/pdf")
+                || m.starts_with("x-scheme-handler/https")
+                || m.starts_with("x-scheme-handler/http")
+                || m.starts_with("x-scheme-handler/mailto")
+        });
+        for mimeapp in &mimeapps {
+            save_config(Some("mimeapps.list"), &[""], mimeapp);
+        }
     }
 
     let window = WindowBuilder::new()
@@ -63,8 +83,12 @@ fn App() -> Element {
 
 pub fn load_config(file: Option<&str>, keys: &[&str]) -> Vec<String> {
     let filename = file.unwrap_or("haremal-ctrl/config.toml");
-    let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
-    let path = std::path::PathBuf::from(base).join(filename);
+    let path = if !filename.starts_with("/") {
+        let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
+        std::path::PathBuf::from(base).join(filename)
+    } else {
+        std::path::PathBuf::from(filename)
+    };
     let content = std::fs::read_to_string(path).ok().unwrap_or_default();
     let lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
 
@@ -94,10 +118,17 @@ pub fn load_config(file: Option<&str>, keys: &[&str]) -> Vec<String> {
 
 pub fn save_config(file: Option<&str>, keys: &[&str], value: &str) {
     let filename = file.unwrap_or("haremal-ctrl/config.toml");
-    let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
-    let path = std::path::PathBuf::from(base).join(filename);
+    let path = if !filename.starts_with("/") {
+        let base = std::env::var("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME is not set!");
+        std::path::PathBuf::from(base).join(filename)
+    } else {
+        std::path::PathBuf::from(filename)
+    };
     let content = std::fs::read_to_string(&path).unwrap_or_default();
     let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
 
     let mut passed = 0;
     let mut starting_line = 0;
@@ -141,7 +172,7 @@ pub fn remove_config(file: Option<&str>, keys: &[&str]) {
     let path = std::path::PathBuf::from(base).join(filename);
     let content = std::fs::read_to_string(&path).unwrap_or_default();
     let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-    println!("AAAAAA");
+
     let mut passed = 0;
     let mut to_remove = None;
     for (i, line) in lines.iter().enumerate() {
