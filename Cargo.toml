@@ -7,8 +7,10 @@ edition = "2021"
 [dependencies]
 dioxus = { version = "0.7.1", features = [] }
 tokio = { version = "1", features = ["full"] }
+bluer = { version = "0.17", features = ["bluetoothd"] }
 locale-codes = "0.3.0"
 rfd = "0.17.2"
+futures-util = { version = "0.3", features = ["alloc"] }
 [features]
 default = ["desktop"]
 desktop = ["dioxus/desktop"]

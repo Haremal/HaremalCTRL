@@ -59,7 +59,8 @@ pub fn Applications() -> Element {
             h1 { "Applications" }
             div {
                 div {
-                    p {
+                    button {
+                        class: "tab_button", margin_left: "-20px", width: "100vw",
                         onclick: move |_| {
                             let state = !tables[0]();
                             tables.iter_mut().for_each(|t| t.set(false));
@@ -69,7 +70,8 @@ pub fn Applications() -> Element {
                     }
                 }
                 div {
-                    p {
+                    button {
+                        class: "tab_button", margin_left: "-20px", width: "100vw",
                         onclick: move |_| {
                             let state = !tables[1]();
                             tables.iter_mut().for_each(|t| t.set(false));
@@ -92,6 +94,7 @@ pub fn Applications() -> Element {
                                 let value2 = values.last()
                                         .and_then(|(_, v)| if let FormValue::Text(s) = v { Some(s.clone()) } else { None })
                                         .unwrap_or_default();
+                                if value1.is_empty() || value2.is_empty() {return;}
                                 let command = format!("    {value1} {{ {value2} }}");
                                 save_config(Some("niri/config.kdl"), &["binds"], &command);
                                 let mut new_list = load_config(Some("niri/config.kdl"), &["binds"]);
@@ -102,40 +105,45 @@ pub fn Applications() -> Element {
                                 keybinds.set(new_list);
                             },
                             table {
-                                font_size: "12px", width: "60vw",
                                 tr {
                                     th { input { name: "shortcut", placeholder: "Mod+Space" } }
                                     th { input { name: "command", placeholder: "spawn \"rio\";" } }
-                                    th { button { padding: "3px", r#type: "submit", "+" } }
+                                    th { button { r#type: "submit", "+" } }
                                 }
                                 for keybind in &keybinds() {{
                                     let first = keybind.split_whitespace().next().unwrap_or("").to_string();
                                     let inside = keybind.split('{').nth(1).and_then(|s| s.split('}').next()).unwrap_or("").to_string();
                                     rsx! {
                                         tr {
-                                            td { "{first}" }
-                                            td { "{inside}" }
-                                            td { onclick: move |_| {
-                                                let first_owned = first.clone();
-                                                spawn(async move {
-                                                    let confirmed = rfd::AsyncMessageDialog::new()
-                                                        .set_level(rfd::MessageLevel::Info)
-                                                        .set_title("Confirm Deletion")
-                                                        .set_description(format!("Delete keybind: {}?", first_owned))
-                                                        .set_buttons(rfd::MessageButtons::YesNo)
-                                                        .show()
-                                                        .await;
-                                                    if confirmed == rfd::MessageDialogResult::Yes {
-                                                        remove_config(Some("niri/config.kdl"), &[&first_owned]);
-                                                        let mut new_list = load_config(Some("niri/config.kdl"), &["binds"]);
-                                                        if !new_list.is_empty() {
-                                                            new_list.remove(0);
-                                                            new_list.pop();
-                                                        }
-                                                        keybinds.set(new_list);
-                                                    }
-                                                });
-                                            }, text_align: "center",  width: "6px", "X" }
+                                            td { p { "{first}" } }
+                                            td { p { "{inside}" } }
+                                            td { text_align: "center",  width: "6px",
+                                                button {
+                                                    r#type: "button",
+                                                    onclick: move |_| {
+                                                        let first_owned = first.clone();
+                                                        spawn(async move {
+                                                            let confirmed = rfd::AsyncMessageDialog::new()
+                                                                .set_level(rfd::MessageLevel::Info)
+                                                                .set_title("Confirm Deletion")
+                                                                .set_description(format!("Delete keybind: {}?", first_owned))
+                                                                .set_buttons(rfd::MessageButtons::YesNo)
+                                                                .show()
+                                                                .await;
+                                                            if confirmed == rfd::MessageDialogResult::Yes {
+                                                                remove_config(Some("niri/config.kdl"), &[&first_owned]);
+                                                                let mut new_list = load_config(Some("niri/config.kdl"), &["binds"]);
+                                                                if !new_list.is_empty() {
+                                                                    new_list.remove(0);
+                                                                    new_list.pop();
+                                                                }
+                                                                keybinds.set(new_list);
+                                                            }
+                                                        });
+                                                    },
+                                                    "X"
+                                                }
+                                            }
                                         }
                                     }
 
@@ -145,7 +153,8 @@ pub fn Applications() -> Element {
                     }
                 }
                 div {
-                    p {
+                    button {
+                        class: "tab_button", margin_left: "-20px", width: "100vw",
                         onclick: move |_| {
                             let state = !tables[2]();
                             tables.iter_mut().for_each(|t| t.set(false));
@@ -164,6 +173,7 @@ pub fn Applications() -> Element {
                                 let value = values.first()
                                         .and_then(|(_, v)| if let FormValue::Text(s) = v { Some(s.clone()) } else { None })
                                         .unwrap_or_default();
+                                if value.is_empty() { return; }
                                 let command = format!("spawn-at-startup \"{value}\"");
                                 save_config(Some("niri/config.kdl"), &["// startups"], &command);
                                 let mut new_list = load_config(Some("niri/config.kdl"), &["spawn-at-startup"]);
@@ -173,36 +183,41 @@ pub fn Applications() -> Element {
                                 startups.set(new_list);
                             },
                             table {
-                                font_size: "20px",
                                 tr {
                                     th { input { name: "command", placeholder: "xwayland-satellite" } }
-                                    th { button { padding: "3px", r#type: "submit", "+" } }
+                                    th { button { r#type: "submit", "+" } }
                                 }
                                 for startup in &startups() {{
                                     let inside = startup.split('"').nth(1).and_then(|s| s.split('"').next()).unwrap_or("").to_string();
                                     rsx! {
                                         tr {
-                                            td { "{inside}" }
-                                            td { onclick: move |_| {
-                                                let inside_owned = inside.clone();
-                                                spawn(async move {
-                                                    let confirmed = rfd::AsyncMessageDialog::new()
-                                                        .set_level(rfd::MessageLevel::Info)
-                                                        .set_title("Confirm Deletion")
-                                                        .set_description(format!("Delete startup: {}?", inside_owned))
-                                                        .set_buttons(rfd::MessageButtons::YesNo)
-                                                        .show()
-                                                        .await;
-                                                    if confirmed == rfd::MessageDialogResult::Yes {
-                                                        remove_config(Some("niri/config.kdl"), &[&inside_owned]);
-                                                        let mut new_list = load_config(Some("niri/config.kdl"), &["spawn-at-startup"]);
-                                                        if !new_list.is_empty() {
-                                                            new_list.pop();
-                                                        }
-                                                        startups.set(new_list);
-                                                    }
-                                                });
-                                            }, text_align: "center",  width: "6px", "X" }
+                                            td { p { "{inside}" } }
+                                            td { text_align: "center",  width: "6px",
+                                                button {
+                                                    r#type: "button",
+                                                    onclick: move |_| {
+                                                        let inside_owned = format!("spawn-at-startup \"{inside}\"");
+                                                        spawn(async move {
+                                                            let confirmed = rfd::AsyncMessageDialog::new()
+                                                                .set_level(rfd::MessageLevel::Info)
+                                                                .set_title("Confirm Deletion")
+                                                                .set_description(format!("Delete startup: {}?", inside_owned))
+                                                                .set_buttons(rfd::MessageButtons::YesNo)
+                                                                .show()
+                                                                .await;
+                                                            if confirmed == rfd::MessageDialogResult::Yes {
+                                                                remove_config(Some("niri/config.kdl"), &[&inside_owned]);
+                                                                let mut new_list = load_config(Some("niri/config.kdl"), &["spawn-at-startup"]);
+                                                                if !new_list.is_empty() {
+                                                                    new_list.pop();
+                                                                }
+                                                                startups.set(new_list);
+                                                            }
+                                                        });
+                                                    },
+                                                    "X"
+                                                }
+                                            }
                                         }
                                     }
                                 }}
@@ -211,7 +226,8 @@ pub fn Applications() -> Element {
                     }
                 }
                 div {
-                    p {
+                    button {
+                        class: "tab_button", margin_left: "-20px", width: "100vw",
                         onclick: move |_| {
                             let state = !tables[3]();
                             tables.iter_mut().for_each(|t| t.set(false));
@@ -220,7 +236,7 @@ pub fn Applications() -> Element {
                         "Defaults"
                     }
                     div {
-                        max_height: if *tables[3].read() { "400px" } else { "0" },
+                        max_height: if *tables[3].read() { "600px" } else { "0" },
                         overflow_y: if *tables[3].read() { "auto" },
                         visibility: if !*tables[3].read() { "hidden" },
 
@@ -268,17 +284,16 @@ pub fn Applications() -> Element {
                                 });
                             },
                             table {
-                                font_size: "17px", width: "60vw",
-                                tr { td { "Browser" } td { "{defaults_ui()[0][1]}" } td { input { name: "browser" } } }
-                                tr { td { "File Manager" } td { "{defaults_ui()[1][1]}" } td { input { name: "manager" } } }
-                                tr { td { "Mail" } td { "{defaults_ui()[2][1]}" } td { input { name: "mail" } } }
-                                tr { td { "Video" } td { "{defaults_ui()[3][1]}" } td { input { name: "video" } } }
-                                tr { td { "Audio" } td { "{defaults_ui()[4][1]}" } td { input { name: "audio" } } }
-                                tr { td { "Text" } td { "{defaults_ui()[5][1]}" } td { input { name: "text" } } }
-                                tr { td { "Image" } td { "{defaults_ui()[6][1]}" } td { input { name: "image" } } }
-                                tr { td { "PDF" } td { "{defaults_ui()[7][1]}" } td { input { name: "pdf" } } }
+                                tr { td { p { "Browser" } }      td { p { "{defaults_ui()[0][1]}" } } td { input { name: "browser" } } }
+                                tr { td { p { "File Manager" } } td { p { "{defaults_ui()[1][1]}" } } td { input { name: "manager" } } }
+                                tr { td { p { "Mail" } }         td { p { "{defaults_ui()[2][1]}" } } td { input { name: "mail" } } }
+                                tr { td { p { "Video" } }        td { p { "{defaults_ui()[3][1]}" } } td { input { name: "video" } } }
+                                tr { td { p { "Audio" } }        td { p { "{defaults_ui()[4][1]}" } } td { input { name: "audio" } } }
+                                tr { td { p { "Text" } }         td { p { "{defaults_ui()[5][1]}" } } td { input { name: "text" } } }
+                                tr { td { p { "Image" } }        td { p { "{defaults_ui()[6][1]}" } } td { input { name: "image" } } }
+                                tr { td { p { "PDF" } }          td { p { "{defaults_ui()[7][1]}" } } td { input { name: "pdf" } } }
                             }
-                            button { padding: "3px", width: "60vw", r#type: "submit", "Save" }
+                            button { padding: "3px", width: "100%", r#type: "submit", "Save" }
                         }
                     }
                 }
