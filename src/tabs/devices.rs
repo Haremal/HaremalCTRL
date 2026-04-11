@@ -1,6 +1,7 @@
 use bluer::{Device, Session};
 use dioxus::prelude::*;
 use futures_util::StreamExt;
+use udev::Enumerator;
 
 #[derive(Clone, Debug)]
 enum DeviceState {
@@ -34,6 +35,15 @@ pub fn Devices() -> Element {
         let mut discovery = Box::pin(discovery);
         loop {
             let mut results = Vec::new();
+            for device in get_wired_devices() {
+                let clean_name = device.replace("\\x20", " ");
+                let is_system = clean_name.contains("Host Controller")
+                    || clean_name.contains("Root Hub")
+                    || clean_name.chars().all(|c| c.is_numeric());
+                if !is_system && !clean_name.is_empty() {
+                    results.push(DeviceState::Wired(clean_name));
+                }
+            }
             if let Ok(addrs) = adapter.device_addresses().await {
                 for addr in addrs {
                     if let Ok(dev) = adapter.device(addr) {
@@ -85,7 +95,7 @@ pub fn Devices() -> Element {
             div {
                 div {
                     div {
-                        display: "flex", align_items: "center", width: "60vw",
+                        display: "flex", align_items: "center", width: "100%",
                         p { flex: "80%", "Bluetooth" }
                         label {
                             class: "switch",
@@ -107,13 +117,16 @@ pub fn Devices() -> Element {
                     }
 
                     div {
-                        visibility: if !ui_on() { "hidden" },
                         table {
                             for device in devices() {
                                 match device {
+                                    DeviceState::Wired(n) => rsx! { tr {
+                                        td { colspan: 2, h2 { "{n}" } span { color: "#9a8c98", "WIRED" } }
+                                    } },
                                     DeviceState::Connected(d, n) => {
                                         let d = d.clone();
                                         rsx! { tr {
+                                            visibility: if !ui_on() { "hidden" },
                                             td { h2 { "{n}" } span { color: "#06d6a0", "CONNECTED" } }
                                             td { width: "10px", button { onclick: move |_| {
                                                 let d = d.clone();
@@ -128,6 +141,7 @@ pub fn Devices() -> Element {
                                         let d1 = d.clone();
                                         let d2 = d.clone();
                                         rsx! { tr {
+                                            visibility: if !ui_on() { "hidden" },
                                             td { h2 { "{n}" } span { color: "#ef476f", "DISCONNECTED" } }
                                             td { width: "10px",
                                                 button { onclick: move |_| {
@@ -151,6 +165,7 @@ pub fn Devices() -> Element {
                                         }
                                     } },
                                     DeviceState::Nearby(d, n) => rsx! { tr {
+                                        visibility: if !ui_on() { "hidden" },
                                         td { h2 { "{n}" } span { color: "#118ab2", "AVAILABLE" } }
                                         td { width: "10px", text_align: "center",
                                             button { onclick: move |_| {
@@ -193,4 +208,18 @@ pub fn Devices() -> Element {
             }
         }
     }
+}
+
+fn get_wired_devices() -> Vec<String> {
+    let mut enumerator = Enumerator::new().unwrap();
+    let mut results = Vec::new();
+    for device in enumerator.scan_devices().unwrap() {
+        if let Some(name) = device.property_value("ID_MODEL_ENC") {
+            let clean_name = name.to_string_lossy();
+            if !results.contains(&clean_name.to_string()) {
+                results.push(clean_name.to_string());
+            }
+        }
+    }
+    results
 }

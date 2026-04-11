@@ -57,9 +57,7 @@ fn App() -> Element {
         main {
             display: "flex",
             div {
-                border_radius: "16px 0px 0px 16px",
-                width: "300px", height: "100vh",
-                background_color: "#1f2126",
+                class: "menu",
                 h2 { font_size: "200%", font_weight: "bold", padding_left: "20px", "HaremalCTRL Settings" },
                 button { onclick: move |_| tab.set(0), class: "tab_button", background_color: if tab() == 0 { "#3f4146" },  "Update" }
                 button { onclick: move |_| tab.set(1), class: "tab_button", background_color: if tab() == 1 { "#3f4146" },  "Region" }

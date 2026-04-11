@@ -1,5 +1,12 @@
+@font-face {
+    font-family: 'Monocraft';
+    src: url('Monocraft.ttc');
+}
+
 * {
+    font-family: 'Monocraft';
     user-select: none;
+    overflow: hidden;
 }
 html, body {
     background: transparent !important;
@@ -12,11 +19,12 @@ main {
     background-color: #0f1116;
     border-radius: 16px;
 }
-.tab {
-    width: 100vw;
-    font-size: 150%;
-    padding: 20px;
-    overflow: hidden;
+.menu {
+  border-radius: 16px 0px 0px 16px;
+  width: 300px;
+  min-width: 300px;
+  height: 100vh;
+  background-color: #1f2126;
 }
 button {
   text-align: center;
@@ -24,38 +32,48 @@ button {
   padding: 10px;
   color: #afafaf;
   font-size: 20px;
-  border: 2px solid #5f5f5f;
+  border: none;
   border-radius: 5px;
   width: 100%;
 }
 button:hover {
-    cursor: pointer;
-    background-color: #2f3136;
+  cursor: pointer;
+  background-color: #2f3136;
 }
 .tab_button {
-    padding: 20px;
-    border: none;
-    font-size: 20px;
-    border-radius: 0;
-    text-align: left;
-    width: 300px;
+  padding: 20px;
+  font-size: 20px;
+  border-radius: 0;
+  text-align: left;
+  width: 300px;
+}
+.tab {
+  width: 100%;
+  font-size: 150%;
+  padding: 20px;
+  overflow: hidden;
 }
 tr { text-align: left; }
 td {
   font-size: 15px;
   background-color: #1A1A21;
   border-radius: 5px;
-  width: 100vw;
+  width: 100%;
+  height: 100%;
 }
 td p { padding-left: 10px; }
 td h2, td span { padding-left: 0px; margin: 7px; }
-td button { border: none; }
-input {
-    height: 35px;
-    width: 100%;
+td button { height: 100%; }
+form input {
+  height: 35px;
+  width: 100%;
+  background-color: Transparent;
+  border: 1px solid #232333;
+  border-radius: 5px;
+  padding-left: 10px;
 }
-button:active {background-color: #3f4146;}
-button:disabled {cursor: auto; background-color: #1f2126; color: #5f5f5f; border: 2px solid #2f2f2f}
+button:active { background-color: #3f4146; }
+button:disabled { cursor: auto; background-color: #1f2126; color: #5f5f5f }
 
 
 
@@ -122,3 +140,4 @@ input:checked + .slider:before {
 .slider.round:before {
   border-radius: 50%;
 } 
+
